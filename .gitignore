@@ -1,0 +1,23 @@
+# Build output
+build/
+nn
+
+# Compiled objects, dependency files, libraries
+*.o
+*.d
+*.a
+*.so
+
+# Editor and tooling
+compile_commands.json
+.cache/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Crash and profiling artifacts
+core
+vgcore.*
+perf.data*
