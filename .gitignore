@@ -2,6 +2,9 @@
 build/
 nn
 
+# Datasets - fetch with scripts/fetch-mnist.sh
+data/
+
 # Compiled objects, dependency files, libraries
 *.o
 *.d
