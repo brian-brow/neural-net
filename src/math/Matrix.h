@@ -21,6 +21,7 @@ public:
 
   void print(std::ostream& os = std::cout) const;
   void randomize();
+  void zero();
 
   Matrix operator+(const Matrix& other) const;
   Matrix operator-(const Matrix& other) const;

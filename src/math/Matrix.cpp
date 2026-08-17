@@ -59,6 +59,14 @@ void Matrix::randomize()
 }
 
 
+void Matrix::zero()
+{
+  for (int i = 0; i < rows * cols; i++) {
+    W.at(i) = 0.0f;
+  }
+}
+
+
 Matrix Matrix::operator*(const Matrix& other) const
 {
   assert(cols == other.rows);
