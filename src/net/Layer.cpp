@@ -1,7 +1,7 @@
 #include "net/Layer.h"
 
 Layer::Layer(int in, int out)
-  : W(out, in), b(out, 1), input(in, 1), preAct(out, 1), output(out, 1)
+  : W(out, in), dW(out, in), b(out, 1), db(out, 1), ak(in, 1), z(out, 1), aj(out, 1)
 {
   W.randomize();
 }
@@ -21,10 +21,32 @@ void Layer::setBias(const Matrix& _b)
 }
 
 
-void Layer::forward(const Matrix& _input)
+void Layer::forward(const Matrix& input)
 {
-  this->input = _input;
-  this->preAct = W * input + b;
-  this->output = ReLU(this->preAct);
+  this->ak = input;
+  this->z = W * input + b;
+  this->aj = ReLU(this->z);
 }
 
+
+Matrix Layer::backward(const Matrix& gradOutput)
+{
+  Matrix errOutput = hadamard(gradOutput, ReLUPrime(z));
+  this->db = db + errOutput;
+  this->dW = dW + errOutput * transpose(ak);
+  return transpose(W) * errOutput;
+}
+
+
+void Layer::applyGradients(float learningRate)
+{
+  W = W - scalarMult(dW, learningRate);
+  b = b - scalarMult(db, learningRate);
+}
+
+
+void Layer::zeroGradients()
+{
+  dW.zero();
+  db.zero();
+}
