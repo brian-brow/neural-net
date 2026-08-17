@@ -91,3 +91,36 @@ Matrix ReLUPrime(const Matrix& a)
 
   return result;
 }
+
+
+Matrix softmax(const Matrix& a)
+{
+  int rows = a.getRows();
+  int cols = a.getCols();
+
+  Matrix result(rows, cols);
+
+  float max = a.at(0, 0);
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < cols; j++) {
+      max = std::max(max, a.at(i, j));
+    }
+  }
+
+  float sum = 0.0f;
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < cols; j++) {
+      float e = std::exp(a.at(i, j) - max);
+      result.setAt(i, j, e);
+      sum += e;
+    }
+  }
+
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < cols; j++) {
+      result.setAt(i, j, result.at(i, j) / sum);
+    }
+  }
+
+  return result;
+}

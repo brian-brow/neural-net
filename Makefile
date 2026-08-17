@@ -2,7 +2,7 @@ CXX      := g++
 SRCDIR   := src
 INCLUDES := -I$(SRCDIR)
 WARNINGS := -Wall -Wextra
-CXXFLAGS := -std=c++20 $(WARNINGS) -g -O0 -MMD -MP $(INCLUDES)
+CXXFLAGS := -std=c++20 $(WARNINGS) -g -O2 -MMD -MP $(INCLUDES)
 LDFLAGS  := -lsfml-graphics -lsfml-window -lsfml-system
 
 TARGET  := nn

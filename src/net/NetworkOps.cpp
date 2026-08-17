@@ -29,3 +29,30 @@ Matrix msePrime(const Matrix& a, const Matrix& y)
 
   return scalarMult((a - y), (2.0f / rows));
 }
+
+float crossEntropy(const Matrix& a, const Matrix& y)
+{
+  int rows = a.getRows();
+
+  assert(rows == y.getRows());
+  assert(a.getCols() == y.getCols());
+  assert(a.getCols() == 1);
+
+  float sum = 0.0f;
+
+  for (int i = 0; i < rows; i++) {
+    float p = std::max(a.at(i, 0), 1e-7f);
+    sum += y.at(i, 0) * std::log(p);
+  }
+
+  return -sum;
+}
+
+Matrix crossEntropyPrime(const Matrix& a, const Matrix& y)
+{
+  assert(a.getRows() == y.getRows());
+  assert(a.getCols() == y.getCols());
+  assert(a.getCols() == 1);
+
+  return a - y;
+}

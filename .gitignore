@@ -4,6 +4,7 @@ nn
 
 # Datasets - fetch with scripts/fetch-mnist.sh
 data/
+weights.txt
 
 # Compiled objects, dependency files, libraries
 *.o
