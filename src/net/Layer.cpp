@@ -1,5 +1,6 @@
 #include "net/Layer.h"
 
+
 Layer::Layer(int in, int out, Activation activation)
   : W(out, in), dW(out, in), b(out, 1), db(out, 1), ak(in, 1), z(out, 1), aj(out, 1)
 {

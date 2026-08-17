@@ -1,5 +1,6 @@
 #include "net/NetworkOps.h"
 
+
 float mse(const Matrix& a, const Matrix& y)
 {
   int rows = a.getRows();
@@ -19,6 +20,7 @@ float mse(const Matrix& a, const Matrix& y)
   return sum / n;
 }
 
+
 Matrix msePrime(const Matrix& a, const Matrix& y)
 {
   int rows = a.getRows();
@@ -29,6 +31,7 @@ Matrix msePrime(const Matrix& a, const Matrix& y)
 
   return scalarMult((a - y), (2.0f / rows));
 }
+
 
 float crossEntropy(const Matrix& a, const Matrix& y)
 {
@@ -47,6 +50,7 @@ float crossEntropy(const Matrix& a, const Matrix& y)
 
   return -sum;
 }
+
 
 Matrix crossEntropyPrime(const Matrix& a, const Matrix& y)
 {

@@ -10,8 +10,6 @@ class Matrix {
 public:
   Matrix(int rows, int cols);
   Matrix(int rows, int cols, std::initializer_list<float> values);
-  // Matrix(Matrix &&) = default;
-  // Matrix(const Matrix &) = default;
 
   float at(int i, int j) const;
   void setAt(int i, int j, float w);
