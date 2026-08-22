@@ -25,6 +25,19 @@ const int HALF        = MAX_VISIBLE / 2;
 // picture's size.
 const float IMAGE_GAP_RATIO = 0.18f;
 
+// The index box, in the bottom margin. Fixed size: it is chrome, not part of
+// the graph, so it does not take the zoom.
+const float BOX_WIDTH      = 132.0f;
+const float BOX_HEIGHT     = 34.0f;
+const float BOX_BOTTOM_GAP = 20.0f;
+const float BOX_PAD        = 10.0f;   // text inset from the left edge
+
+// 999999 fits an int, so submitIndex can use stoi without a range check.
+const size_t MAX_DIGITS = 6;
+
+const float CARET_PERIOD  = 1.06f;
+const float REJECT_FLASH  = 0.6f;   // how long a refused entry stays red
+
 // Extra spacing before the target column, in units of the normal column gap,
 // so it reads as detached from the network.
 const float TARGET_EXTRA_GAP = 0.55f;
@@ -55,6 +68,10 @@ const sf::Color NEUTRAL(122, 122, 134);   // a weight of 0
 const sf::Color NEGATIVE(235, 62, 52);    // most negative weight
 const sf::Color POSITIVE(58, 118, 240);   // most positive weight
 const sf::Color TARGET_OUTLINE(196, 154, 74);  // reference column, not a layer
+const sf::Color OUTLINE(90, 90, 100);
+const sf::Color BOX_FILL(34, 34, 42);
+const sf::Color BOX_TEXT(224, 224, 232);
+const sf::Color LABEL(150, 150, 160);
 
 // A line must stay at least this far above the background in luminance.
 const float MIN_CONTRAST = 55.0f;
@@ -115,10 +132,11 @@ float maxAbsWeight(const std::vector<Layer>& net)
   float scale = 0.0f;
 
   for (const Layer& l : net) {
-    Matrix W = l.getWeights();
-    for (int i = 0; i < W.getRows(); i++) {
-      for (int j = 0; j < W.getCols(); j++) {
-        scale = std::max(scale, std::abs(W.at(i, j)));
+    const Tensor& W = l.getWeights();
+    std::vector<int> wd = W.getDims();
+    for (int i = 0; i < wd[0]; i++) {
+      for (int j = 0; j < wd[1]; j++) {
+        scale = std::max(scale, std::abs(W.at({i, j})));
       }
     }
   }
@@ -178,19 +196,54 @@ sf::ContextSettings antialiased()
 }  // namespace
 
 
-Visualizer::Visualizer(unsigned int width, unsigned int height)
+Visualizer::Visualizer(int sampleCount, unsigned int width, unsigned int height)
   : window(sf::VideoMode({width, height}), "Neural Net",
            sf::Style::Default, sf::State::Windowed, antialiased()),
     font(loadFont()),
     nodeRadius(BASE_RADIUS),
-    zoom(1.0f)
+    zoom(1.0f),
+    sampleCount(sampleCount)
 {
   window.setFramerateLimit(60);
 }
 
 
-void Visualizer::pollEvents()
+sf::FloatRect Visualizer::indexBoxRect() const
 {
+  auto size = window.getSize();
+
+  return sf::FloatRect({size.x / 2.0f - BOX_WIDTH / 2.0f,
+                        size.y - BOX_BOTTOM_GAP - BOX_HEIGHT},
+                       {BOX_WIDTH, BOX_HEIGHT});
+}
+
+
+void Visualizer::setIndex(int i)
+{
+  typed = std::to_string(i);
+  settled = true;
+}
+
+
+void Visualizer::submitIndex(Request& request)
+{
+  int i = typed.empty() ? -1 : std::stoi(typed);
+
+  if (i < 0 || i >= sampleCount) {
+    everRejected = true;
+    rejected.restart();
+    return;
+  }
+
+  request.index = i;
+  settled = true;
+}
+
+
+Visualizer::Request Visualizer::pollEvents()
+{
+  Request request;
+
   while (const std::optional event = window.pollEvent()) {
     if (event->is<sf::Event::Closed>()) {
       window.close();
@@ -206,21 +259,60 @@ void Visualizer::pollEvents()
       if (key->code == sf::Keyboard::Key::Escape || key->code == sf::Keyboard::Key::Q) {
         window.close();
       }
+
+      // Backspace and Enter arrive as text too, but only as control codes, so
+      // they are handled here where they have names.
+      if (key->code == sf::Keyboard::Key::Backspace && !typed.empty()) {
+        typed.pop_back();
+        settled = false;
+      }
+
+      if (key->code == sf::Keyboard::Key::Enter) {
+        submitIndex(request);
+      }
+    }
+
+    // Digits only, from either the number row or the keypad. There is nothing
+    // else on screen to type into, so the box needs no focus state.
+    if (const auto* text = event->getIf<sf::Event::TextEntered>()) {
+      char32_t c = text->unicode;
+
+      if (c >= U'0' && c <= U'9') {
+        if (settled) {
+          typed.clear();
+          settled = false;
+        }
+
+        if (typed.size() < MAX_DIGITS) {
+          typed.push_back(static_cast<char>(c));
+        }
+      }
+    }
+
+    // Several clicks inside one poll batch collapse into one, so a frame can
+    // never be asked for more than one new sample.
+    if (const auto* click = event->getIf<sf::Event::MouseButtonPressed>()) {
+      if (click->button == sf::Mouse::Button::Left &&
+          !indexBoxRect().contains(sf::Vector2f(click->position))) {
+        request.randomSample = true;
+      }
     }
   }
+
+  return request;
 }
 
 
 std::vector<Visualizer::Column> Visualizer::layout(
-    const Matrix& input, const std::vector<Layer>& net, const Matrix& target)
+    const Tensor& input, const std::vector<Layer>& net, const Tensor& target)
 {
   // Last entry is the target, which is drawn but never wired to anything.
   std::vector<int> counts;
-  counts.push_back(input.getRows());
+  counts.push_back(input.getDims()[0]);
   for (const Layer& l : net) {
-    counts.push_back(l.getOutput().getRows());
+    counts.push_back(l.getOutput().getDims()[0]);
   }
-  counts.push_back(target.getRows());
+  counts.push_back(target.getDims()[0]);
 
   auto size = window.getSize();
   float usableW = size.x - 2 * MARGIN;
@@ -312,7 +404,7 @@ std::vector<Visualizer::Column> Visualizer::layout(
 }
 
 
-void Visualizer::drawInputImage(const Matrix& input)
+void Visualizer::drawInputImage(const Tensor& input)
 {
   if (!inputImage.visible) {
     return;
@@ -327,7 +419,7 @@ void Visualizer::drawInputImage(const Matrix& input)
       sf::RectangleShape pixel({cell + 0.5f, cell + 0.5f});
       pixel.setPosition({inputImage.topLeft.x + cell * c,
                          inputImage.topLeft.y + cell * r});
-      pixel.setFillColor(activationColor(input.at(r * side + c, 0)));
+      pixel.setFillColor(activationColor(input.at({r * side + c, 0})));
 
       window.draw(pixel);
     }
@@ -340,6 +432,59 @@ void Visualizer::drawInputImage(const Matrix& input)
   border.setOutlineColor(sf::Color(90, 90, 100));
 
   window.draw(border);
+}
+
+
+void Visualizer::drawIndexBox()
+{
+  sf::FloatRect box = indexBoxRect();
+  bool flashing = everRejected && rejected.getElapsedTime().asSeconds() < REJECT_FLASH;
+
+  sf::RectangleShape frame(box.size);
+  frame.setPosition(box.position);
+  frame.setFillColor(BOX_FILL);
+  frame.setOutlineThickness(1.5f);
+  frame.setOutlineColor(flashing ? NEGATIVE : OUTLINE);
+
+  window.draw(frame);
+
+  if (!font) {
+    return;
+  }
+
+  auto size = static_cast<unsigned int>(BOX_HEIGHT * 0.47f);
+  float textX = box.position.x + BOX_PAD;
+  float caretX = textX;
+
+  if (!typed.empty()) {
+    sf::Text text(*font, typed, size);
+    text.setFillColor(BOX_TEXT);
+
+    // getLocalBounds carries its own offset, so centring has to subtract it.
+    auto bounds = text.getLocalBounds();
+    text.setPosition({textX,
+                      box.position.y + (box.size.y - bounds.size.y) / 2.0f - bounds.position.y});
+
+    window.draw(text);
+    caretX = textX + bounds.size.x + 3.0f;
+  }
+
+  if (std::fmod(caret.getElapsedTime().asSeconds(), CARET_PERIOD) < CARET_PERIOD / 2.0f) {
+    sf::RectangleShape mark({1.5f, box.size.y * 0.55f});
+    mark.setPosition({caretX, box.position.y + box.size.y * 0.225f});
+    mark.setFillColor(BOX_TEXT);
+
+    window.draw(mark);
+  }
+
+  sf::Text name(*font, "image #", size);
+  name.setFillColor(LABEL);
+
+  auto bounds = name.getLocalBounds();
+  name.setPosition({box.position.x - BOX_PAD - bounds.size.x,
+                    box.position.y + (box.size.y - bounds.size.y) / 2.0f - bounds.position.y});
+
+  window.draw(name);
 }
 
 
@@ -359,21 +504,23 @@ void Visualizer::drawEllipsis(const Column& column)
 }
 
 
-void Visualizer::render(const Matrix& input, const std::vector<Layer>& net,
-                        const Matrix& target)
+void Visualizer::render(const Tensor& input, const std::vector<Layer>& net,
+                        const Tensor& target)
 {
   window.clear(BACKGROUND);
 
   auto columns = layout(input, net, target);
   float scale = maxAbsWeight(net);
 
-  // One value matrix per column, in the same order layout() built them.
-  std::vector<Matrix> values;
-  values.push_back(input);
+  // One value tensor per column, in the same order layout() built them. These
+  // are pointers rather than copies -- a Tensor copy is a deep copy, and this
+  // runs every frame.
+  std::vector<const Tensor*> values;
+  values.push_back(&input);
   for (const Layer& l : net) {
-    values.push_back(l.getOutput());
+    values.push_back(&l.getOutput());
   }
-  values.push_back(target);
+  values.push_back(&target);
 
   // Nodes track the zoom, but never grow into their neighbours.
   nodeRadius = BASE_RADIUS * zoom;
@@ -387,13 +534,13 @@ void Visualizer::render(const Matrix& input, const std::vector<Layer>& net,
   // Connections first so the nodes sit on top of them. Only weights joining two
   // drawn nodes are shown, so every line on screen is a real W entry.
   for (size_t l = 0; l < net.size(); l++) {
-    Matrix W = net[l].getWeights();          // (out x in)
+    const Tensor& W = net[l].getWeights();   // (out x in)
     const auto& from = columns[l];
     const auto& to   = columns[l + 1];
 
     for (const Slot& out : to.slots) {
       for (const Slot& in : from.slots) {
-        float w = W.at(out.index, in.index);
+        float w = W.at({out.index, in.index});
         float strength = scale > 0.0f ? std::abs(w) / scale : 0.0f;
         float thickness = MIN_THICK + (MAX_THICK - MIN_THICK) * strength;
 
@@ -410,7 +557,7 @@ void Visualizer::render(const Matrix& input, const std::vector<Layer>& net,
       sf::CircleShape node(nodeRadius);
       node.setOrigin({nodeRadius, nodeRadius});
       node.setPosition(slot.pos);
-      node.setFillColor(activationColor(values[c].at(slot.index, 0)));
+      node.setFillColor(activationColor(values[c]->at({slot.index, 0})));
       node.setOutlineThickness(1.5f);
       node.setOutlineColor(outline);
 
@@ -445,6 +592,8 @@ void Visualizer::render(const Matrix& input, const std::vector<Layer>& net,
       window.draw(label);
     }
   }
+
+  drawIndexBox();
 
   window.display();
 }

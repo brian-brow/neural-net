@@ -5,6 +5,7 @@
 #include <cmath>
 #include "math/Matrix.h"
 #include "math/MatrixOps.h"
+#include "math/Tensor.h"
 
 float mse(const Matrix& a, const Matrix& y);
 
@@ -13,5 +14,13 @@ Matrix msePrime(const Matrix& a, const Matrix& y);
 float crossEntropy(const Matrix& a, const Matrix& y);
 
 Matrix crossEntropyPrime(const Matrix& a, const Matrix& y);
+
+float mse(const Tensor& a, const Tensor& y);
+
+Tensor msePrime(const Tensor& a, const Tensor& y);
+
+float crossEntropy(const Tensor& a, const Tensor& y);
+
+Tensor crossEntropyPrime(const Tensor& a, const Tensor& y);
 
 #endif

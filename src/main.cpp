@@ -4,6 +4,8 @@
 #include "app/Train.h"
 #include "app/Visualize.h"
 #include "data/Mnist.h"
+#include "math/Tensor.h"
+#include "math/TensorOps.h"
 
 
 int main()

@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-#include "math/MatrixOps.h"
+#include "math/TensorOps.h"
 #include "net/NetworkOps.h"
 #include "net/Layer.h"
 
@@ -23,8 +23,8 @@ public:
   // or a diverged run overwrites the last good weights with garbage.
   bool isFinite() const;
 
-  void forward(const Matrix& input);
-  void backward(const Matrix& target);
+  void forward(const Tensor& input);
+  void backward(const Tensor& target);
 
   void zero();
   void applyGradients(float learningRate, int count);

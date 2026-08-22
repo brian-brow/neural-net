@@ -18,6 +18,25 @@ int argmax(const Matrix& m)
 }
 
 
+int argmax(const Tensor& t)
+{
+  std::vector<int> d = t.getDims();
+
+  assert(d.size() == 2);
+  assert(d[1] == 1);
+
+  int best = 0;
+
+  for (int i = 1; i < d[0]; i++) {
+    if (t.at({i, 0}) > t.at({best, 0})) {
+      best = i;
+    }
+  }
+
+  return best;
+}
+
+
 Metrics evaluate(Network& net, const MnistSet& set)
 {
   float totalCost = 0.0f;
@@ -25,7 +44,7 @@ Metrics evaluate(Network& net, const MnistSet& set)
 
   for (int i = 0; i < set.size(); i++) {
     net.forward(set.images[i]);
-    const Matrix& out = net.getLayers().back().getOutput();
+    const Tensor& out = net.getLayers().back().getOutput();
 
     totalCost += crossEntropy(out, set.targets[i]);
 

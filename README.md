@@ -79,6 +79,10 @@ Constants are at the top of `src/main.cpp`.
 
 SFML. `Esc` or `Q` to quit, resizable.
 
+Left click anywhere for a random test image. The box at the bottom jumps to a
+specific one: type a number, `Enter`. Out-of-range entries flash red and are
+ignored. The box always shows the image currently on screen.
+
 Input drawn as a 28x28 grid on the left. Nodes shaded by activation, black to
 white. Weights are lines, red negative through grey to blue positive, thickness
 by magnitude. Layers over 16 nodes show the first and last 8 with an ellipsis

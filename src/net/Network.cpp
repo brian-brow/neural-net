@@ -65,20 +65,20 @@ Network Network::load(const std::string& path)
                                " for layer " + std::to_string(l));
     }
 
-    Matrix W(out, in);
+    Tensor W({out, in});
     for (int i = 0; i < out; i++) {
       for (int j = 0; j < in; j++) {
         float v = 0.0f;
         file >> v;
-        W.setAt(i, j, v);
+        W.setAt({i, j}, v);
       }
     }
 
-    Matrix b(out, 1);
+    Tensor b({out, 1});
     for (int i = 0; i < out; i++) {
       float v = 0.0f;
       file >> v;
-      b.setAt(i, 0, v);
+      b.setAt({i, 0}, v);
     }
 
     // One check after the whole layer rather than per value, so a truncated
@@ -92,7 +92,7 @@ Network Network::load(const std::string& path)
     layer.setWeights(W);
     layer.setBias(b);
 
-    net.layers.push_back(layer);
+    net.layers.push_back(std::move(layer));
   }
 
   net.LAYERS = net.layers.size();
@@ -104,18 +104,20 @@ Network Network::load(const std::string& path)
 bool Network::isFinite() const
 {
   for (const Layer& l : layers) {
-    const Matrix& W = l.getWeights();
-    for (int i = 0; i < W.getRows(); i++) {
-      for (int j = 0; j < W.getCols(); j++) {
-        if (!std::isfinite(W.at(i, j))) {
+    const Tensor& W = l.getWeights();
+    std::vector<int> wd = W.getDims();
+    for (int i = 0; i < wd[0]; i++) {
+      for (int j = 0; j < wd[1]; j++) {
+        if (!std::isfinite(W.at({i, j}))) {
           return false;
         }
       }
     }
 
-    const Matrix& b = l.getBias();
-    for (int i = 0; i < b.getRows(); i++) {
-      if (!std::isfinite(b.at(i, 0))) {
+    const Tensor& b = l.getBias();
+    std::vector<int> bd = b.getDims();
+    for (int i = 0; i < bd[0]; i++) {
+      if (!std::isfinite(b.at({i, 0}))) {
         return false;
       }
     }
@@ -140,21 +142,24 @@ void Network::save(const std::string& path) const
   file << layers.size() << '\n';
 
   for (const Layer& l : layers) {
-    const Matrix& W = l.getWeights();   // (out x in)
-    const Matrix& b = l.getBias();
+    const Tensor& W = l.getWeights();   // (out x in)
+    const Tensor& b = l.getBias();
 
-    file << W.getCols() << ' ' << W.getRows() << ' '
+    std::vector<int> wd = W.getDims();
+    std::vector<int> bd = b.getDims();
+
+    file << wd[1] << ' ' << wd[0] << ' '
          << static_cast<int>(l.getActivation()) << '\n';
 
-    for (int i = 0; i < W.getRows(); i++) {
-      for (int j = 0; j < W.getCols(); j++) {
-        file << W.at(i, j) << ' ';
+    for (int i = 0; i < wd[0]; i++) {
+      for (int j = 0; j < wd[1]; j++) {
+        file << W.at({i, j}) << ' ';
       }
       file << '\n';
     }
 
-    for (int i = 0; i < b.getRows(); i++) {
-      file << b.at(i, 0) << ' ';
+    for (int i = 0; i < bd[0]; i++) {
+      file << b.at({i, 0}) << ' ';
     }
     file << '\n';
   }
@@ -165,7 +170,7 @@ void Network::save(const std::string& path) const
 }
 
 
-void Network::forward(const Matrix& input)
+void Network::forward(const Tensor& input)
 {
   layers[0].forward(input);
   for (int i = 1; i < LAYERS; i++) {
@@ -174,9 +179,9 @@ void Network::forward(const Matrix& input)
 }
 
 
-void Network::backward(const Matrix& target)
+void Network::backward(const Tensor& target)
 {
-  Matrix prev = layers[LAYERS-1].backward(
+  Tensor prev = layers[LAYERS-1].backward(
                   crossEntropyPrime(layers[LAYERS-1].getOutput(), target));
   for (int i = LAYERS - 2; i >= 0; i--) {
     prev = layers[i].backward(prev);

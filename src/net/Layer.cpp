@@ -2,50 +2,51 @@
 
 
 Layer::Layer(int in, int out, Activation activation)
-  : W(out, in), dW(out, in), b(out, 1), db(out, 1), ak(in, 1), z(out, 1), aj(out, 1)
+  : W({out, in}), dW({out, in}), b({out, 1}), db({out, 1}),
+    ak({in, 1}), z({out, 1}), aj({out, 1})
 {
   this->activation = activation;
   W.randomize();
 }
 
 
-void Layer::setWeights(const Matrix& w)
+void Layer::setWeights(const Tensor& w)
 {
-  assert(w.getRows() == W.getRows() && w.getCols() == W.getCols());
+  assert(w.getDims() == W.getDims());
   this->W = w;
 }
 
 
-void Layer::setBias(const Matrix& _b)
+void Layer::setBias(const Tensor& _b)
 {
-  assert(_b.getRows() == b.getRows() && _b.getCols() == b.getCols());
+  assert(_b.getDims() == b.getDims());
   this->b = _b;
 }
 
 
-void Layer::forward(const Matrix& input)
+void Layer::forward(const Tensor& input)
 {
   this->ak = input;
-  this->z = W * input + b;
+  this->z = TensorOps::matmul(W, input) + b;
   if (activation == Activation::ReLU) {
-    this->aj = ReLU(this->z);
+    this->aj = TensorOps::ReLU(this->z);
   } else {
-    this->aj = softmax(this->z);
+    this->aj = TensorOps::softmax(this->z);
   }
 }
 
 
-Matrix Layer::backward(const Matrix& gradOutput)
+Tensor Layer::backward(const Tensor& gradOutput)
 {
-  Matrix errOutput(gradOutput.getRows(), gradOutput.getCols());
+  Tensor errOutput(gradOutput.getDims());
   if (activation == Activation::ReLU) {
-    errOutput = hadamard(gradOutput, ReLUPrime(z));
+    errOutput = gradOutput * TensorOps::ReLUPrime(z);
   } else {
     errOutput = gradOutput;
   }
   this->db = db + errOutput;
-  this->dW = dW + errOutput * transpose(ak);
-  return transpose(W) * errOutput;
+  this->dW = dW + TensorOps::matmul(errOutput, ak.transpose());
+  return TensorOps::matmul(W.transpose(), errOutput);
 }
 
 
@@ -55,8 +56,8 @@ void Layer::applyGradients(float learningRate, int count)
 
   float scale = learningRate / count;
 
-  W = W - scalarMult(dW, scale);
-  b = b - scalarMult(db, scale);
+  W = W - dW * scale;
+  b = b - db * scale;
 }
 
 
